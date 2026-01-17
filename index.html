@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Explorateur Réseaux SAE 1.02</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Palette and Style Configuration -->
+    <!-- Chosen Palette: Warm Neutrals & Tech Slate -->
+    <!-- Background: #FAFAF9 (Stone 50) -->
+    <!-- Primary Text: #1C1917 (Stone 900) -->
+    <!-- Accents: #0EA5E9 (Sky 500) for tech elements, #F59E0B (Amber 500) for highlights -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FAFAF9; /* Stone 50 */
+            color: #1C1917; /* Stone 900 */
+        }
+        
+        .section-card {
+            background-color: #FFFFFF;
+            border: 1px solid #E7E5E4; /* Stone 200 */
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            border-radius: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        .section-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Chart Container Strict Styling */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+
+        /* Topology Node Styling */
+        .topology-node {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .topology-node:hover {
+            transform: translateY(-2px);
+            border-color: #0EA5E9; /* Sky 500 */
+        }
+        .topology-node.active {
+            background-color: #E0F2FE; /* Sky 100 */
+            border-color: #0284C7; /* Sky 600 */
+        }
+
+        .nav-link.active {
+            color: #0284C7;
+            border-bottom: 2px solid #0284C7;
+        }
+    </style>
+
+    <!-- Application Structure Plan: 
+         1. Header: Global nav and Title.
+         2. Intro Section: Contextualizing networks (Home vs Enterprise).
+         3. Infrastructure Section: Physical layer details + Cabling Chart.
+         4. Equipment Section: Interactive Topology Map + Definitions.
+         5. Power Section: POE Standards Chart + Electrical safety.
+         
+         WHY: This structure moves from the abstract (concepts) to the physical (cables), 
+         then to the logical devices (routers/switches), and finally to the supporting utilities (power),
+         mimicking the layers of understanding required for a network technician.
+    -->
+
+    <!-- Visualization & Content Choices:
+         1. Cabling Speeds -> Bar Chart -> Goal: Compare speed evolution across Categories (5 to 8).
+         2. POE Standards -> Bar Chart -> Goal: Compare wattage capacity (af/at/bt).
+         3. Topology -> CSS Grid Flow -> Goal: Visualize relationships between devices without SVG.
+         4. Interaction -> Click-to-reveal -> Goal: Prevent info-dump, allow user to focus on specific components.
+    -->
+
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="antialiased min-h-screen flex flex-col">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-stone-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl text-sky-600 font-bold">●</span>
+                    <h1 class="text-xl font-bold tracking-tight text-stone-800">SAE 1.02 <span class="font-normal text-stone-500 hidden sm:inline">| Initiation Réseaux</span></h1>
+                </div>
+                <div class="hidden md:flex space-x-8">
+                    <button onclick="scrollToSection('context')" class="nav-link text-stone-600 hover:text-sky-600 px-1 py-2 text-sm font-medium transition-colors">Contexte</button>
+                    <button onclick="scrollToSection('infra')" class="nav-link text-stone-600 hover:text-sky-600 px-1 py-2 text-sm font-medium transition-colors">Infrastructure</button>
+                    <button onclick="scrollToSection('equipment')" class="nav-link text-stone-600 hover:text-sky-600 px-1 py-2 text-sm font-medium transition-colors">Équipements</button>
+                    <button onclick="scrollToSection('power')" class="nav-link text-stone-600 hover:text-sky-600 px-1 py-2 text-sm font-medium transition-colors">Alimentation & POE</button>
+                </div>
+                <!-- Mobile Menu Button (simplified interaction) -->
+                <button onclick="toggleMobileMenu()" class="md:hidden text-stone-500 hover:text-stone-900 focus:outline-none">
+                    <span class="text-2xl">☰</span>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white border-b border-stone-200">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <button onclick="scrollToSection('context')" class="block w-full text-left px-3 py-2 text-base font-medium text-stone-600 hover:bg-stone-50 hover:text-sky-600 rounded-md">Contexte</button>
+                <button onclick="scrollToSection('infra')" class="block w-full text-left px-3 py-2 text-base font-medium text-stone-600 hover:bg-stone-50 hover:text-sky-600 rounded-md">Infrastructure</button>
+                <button onclick="scrollToSection('equipment')" class="block w-full text-left px-3 py-2 text-base font-medium text-stone-600 hover:bg-stone-50 hover:text-sky-600 rounded-md">Équipements</button>
+                <button onclick="scrollToSection('power')" class="block w-full text-left px-3 py-2 text-base font-medium text-stone-600 hover:bg-stone-50 hover:text-sky-600 rounded-md">Alimentation</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-16">
+
+        <!-- Header Intro -->
+        <header class="text-center max-w-3xl mx-auto mb-12">
+            <h2 class="text-3xl font-extrabold text-stone-900 sm:text-4xl mb-4">Comprendre l'Infrastructure Numérique</h2>
+            <p class="text-lg text-stone-600 leading-relaxed">
+                Ce module interactif synthétise les fondamentaux de la SAE 1.02. Explorez les composants physiques, les équipements actifs et les normes d'alimentation qui constituent un réseau d'entreprise moderne.
+            </p>
+        </header>
+
+        <!-- SECTION 1: CONTEXTE -->
+        <section id="context" class="scroll-mt-20">
+            <div class="mb-6 border-l-4 border-sky-500 pl-4">
+                <h3 class="text-2xl font-bold text-stone-900">1. Domestique vs Entreprise</h3>
+                <p class="text-stone-600 mt-1">Un réseau d'entreprise n'est pas simplement un "gros" réseau domestique. Il répond à des exigences de sécurité, de performance et de gestion radicalement différentes.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Domestic Card -->
+                <div class="section-card p-6 border-t-4 border-t-stone-300">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-xl font-bold text-stone-800">🏠 Réseau Domestique</h4>
+                        <span class="bg-stone-100 text-stone-600 text-xs px-2 py-1 rounded-full uppercase tracking-wide">Simple</span>
+                    </div>
+                    <ul class="space-y-3 text-stone-600">
+                        <li class="flex items-start"><span class="mr-2 text-sky-500">✓</span> <strong>Matériel :</strong> Box FAI (Tout-en-un), PC, Smartphones, Console.</li>
+                        <li class="flex items-start"><span class="mr-2 text-sky-500">✓</span> <strong>Objectif :</strong> Accès Internet, Multimédia.</li>
+                        <li class="flex items-start"><span class="mr-2 text-sky-500">✓</span> <strong>Étendue :</strong> Quelques pièces.</li>
+                        <li class="flex items-start"><span class="mr-2 text-red-400">✗</span> <strong>Sécurité :</strong> Basique (WPA2).</li>
+                    </ul>
+                </div>
+
+                <!-- Enterprise Card -->
+                <div class="section-card p-6 border-t-4 border-t-sky-600">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="text-xl font-bold text-stone-800">🏢 Réseau d'Entreprise</h4>
+                        <span class="bg-sky-100 text-sky-700 text-xs px-2 py-1 rounded-full uppercase tracking-wide">Complexe</span>
+                    </div>
+                    <ul class="space-y-3 text-stone-600">
+                        <li class="flex items-start"><span class="mr-2 text-sky-500">✓</span> <strong>Matériel :</strong> Baies, Switchs dédiés, Serveurs, Pare-feu.</li>
+                        <li class="flex items-start"><span class="mr-2 text-sky-500">✓</span> <strong>Objectif :</strong> Disponibilité, Partage de données, Téléphonie IP.</li>
+                        <li class="flex items-start"><span class="mr-2 text-sky-500">✓</span> <strong>Gestion :</strong> VLANs, Authentification centralisée (AD).</li>
+                        <li class="flex items-start"><span class="mr-2 text-green-500">✓</span> <strong>Sécurité :</strong> Critique (Filtrage, Logs, Onduleurs).</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: INFRASTRUCTURE -->
+        <section id="infra" class="scroll-mt-20">
+            <div class="mb-6 border-l-4 border-sky-500 pl-4">
+                <h3 class="text-2xl font-bold text-stone-900">2. L'Infrastructure Physique</h3>
+                <p class="text-stone-600 mt-1">Le socle du réseau repose sur le câblage et le local technique. La performance finale dépend directement de la qualité de ces éléments passifs.</p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Physical Constraints -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="section-card p-6">
+                        <h4 class="font-bold text-lg text-stone-800 mb-3">Local Technique</h4>
+                        <p class="text-sm text-stone-600 mb-4">Lieu centralisant les connexions. Critères essentiels :</p>
+                        <div class="space-y-2">
+                            <div class="flex items-center p-2 bg-stone-50 rounded">
+                                <span class="text-xl mr-3">🔒</span>
+                                <div class="text-sm"><strong>Accès :</strong> Restreint, badge, traçabilité.</div>
+                            </div>
+                            <div class="flex items-center p-2 bg-stone-50 rounded">
+                                <span class="text-xl mr-3">❄️</span>
+                                <div class="text-sm"><strong>Climatisation :</strong> Maintien T° constante pour serveurs.</div>
+                            </div>
+                            <div class="flex items-center p-2 bg-stone-50 rounded">
+                                <span class="text-xl mr-3">📏</span>
+                                <div class="text-sm"><strong>Baie (Rack) :</strong> Armoire standardisée. <br><span class="text-sky-600">1U ≈ 4.45 cm</span>.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-card p-6 bg-stone-900 text-white">
+                        <h4 class="font-bold text-lg mb-3">Fibre Optique</h4>
+                        <p class="text-sm text-stone-300 mb-4">Immunité totale aux interférences.</p>
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div class="bg-stone-800 p-2 rounded">
+                                <div class="font-bold text-sky-400">Multimode</div>
+                                <div class="text-xs text-stone-400">Courte distance<br>(Intra-bâtiment)</div>
+                            </div>
+                            <div class="bg-stone-800 p-2 rounded">
+                                <div class="font-bold text-sky-400">Monomode</div>
+                                <div class="text-xs text-stone-400">Longue distance<br>(Inter-site)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cabling Chart -->
+                <div class="lg:col-span-2 section-card p-6">
+                    <h4 class="font-bold text-lg text-stone-800 mb-2">Performance des Câbles Cuivre (RJ45)</h4>
+                    <p class="text-sm text-stone-500 mb-6">Comparatif des débits théoriques par catégorie. La longueur maximale est de 100m pour tous.</p>
+                    
+                    <div class="chart-container">
+                        <canvas id="cablingChart"></canvas>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs text-stone-500">
+                        <div class="bg-stone-50 p-2 rounded"><strong>UTP</strong><br>Non blindé</div>
+                        <div class="bg-stone-50 p-2 rounded"><strong>FTP</strong><br>Blindage global</div>
+                        <div class="bg-stone-50 p-2 rounded"><strong>STP</strong><br>Blindage par paire</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: EQUIPMENTS -->
+        <section id="equipment" class="scroll-mt-20">
+            <div class="mb-6 border-l-4 border-sky-500 pl-4">
+                <h3 class="text-2xl font-bold text-stone-900">3. Architecture & Équipements Actifs</h3>
+                <p class="text-stone-600 mt-1">Interagissez avec la topologie ci-dessous pour découvrir le rôle de chaque composant. Cette architecture type sépare l'accès (utilisateurs) du cœur de réseau.</p>
+            </div>
+
+            <div class="grid lg:grid-cols-3 gap-8">
+                <!-- Interactive Topology Map -->
+                <div class="lg:col-span-2 section-card p-8 bg-stone-50">
+                    <div class="grid grid-cols-4 gap-4 text-center items-center relative">
+                        
+                        <!-- Internet Level -->
+                        <div class="col-span-4 flex justify-center mb-4">
+                            <div onclick="showDetails('internet')" class="topology-node bg-stone-200 border-2 border-stone-300 p-4 rounded-lg shadow-sm w-48">
+                                <div class="text-3xl mb-2">☁️</div>
+                                <div class="font-bold text-stone-700">Internet / WAN</div>
+                            </div>
+                        </div>
+
+                        <!-- Connector Line Vertical -->
+                        <div class="col-span-4 flex justify-center -my-4 relative z-0">
+                            <div class="h-8 w-1 bg-stone-300"></div>
+                        </div>
+
+                        <!-- Router Level -->
+                        <div class="col-span-4 flex justify-center mb-4 relative z-10">
+                            <div onclick="showDetails('router')" class="topology-node bg-white border-2 border-sky-200 p-4 rounded-lg shadow w-48 hover:border-sky-500">
+                                <div class="text-3xl mb-2">🔄</div>
+                                <div class="font-bold text-stone-800">Routeur</div>
+                                <div class="text-xs text-stone-500">Passerelle</div>
+                            </div>
+                        </div>
+
+                        <!-- Firewall Level -->
+                        <div class="col-span-4 flex justify-center mb-4">
+                            <div onclick="showDetails('firewall')" class="topology-node bg-white border-2 border-red-100 p-3 rounded-lg shadow w-48 hover:border-red-400">
+                                <div class="text-3xl mb-1">🛡️</div>
+                                <div class="font-bold text-stone-800">Pare-feu</div>
+                                <div class="text-xs text-stone-500">Sécurité périmétrique</div>
+                            </div>
+                        </div>
+
+                        <!-- Core Switch Level -->
+                        <div class="col-span-4 flex justify-center mb-6">
+                            <div onclick="showDetails('switch')" class="topology-node bg-white border-2 border-indigo-100 p-4 rounded-lg shadow w-64 hover:border-indigo-500">
+                                <div class="text-3xl mb-2">🔀</div>
+                                <div class="font-bold text-stone-800">Switch Cœur</div>
+                                <div class="text-xs text-stone-500">Distribution haute vitesse</div>
+                            </div>
+                        </div>
+
+                        <!-- Access Level (Branches) -->
+                        <div class="col-span-4 grid grid-cols-3 gap-4">
+                            <!-- Server Branch -->
+                            <div class="flex flex-col items-center">
+                                <div class="h-6 w-1 bg-stone-300 mb-2"></div>
+                                <div onclick="showDetails('server')" class="topology-node bg-stone-800 text-white p-3 rounded-lg shadow w-full max-w-[120px]">
+                                    <div class="text-2xl">🖥️</div>
+                                    <div class="font-bold text-sm">Serveurs</div>
+                                </div>
+                            </div>
+                            <!-- User Branch -->
+                            <div class="flex flex-col items-center">
+                                <div class="h-6 w-1 bg-stone-300 mb-2"></div>
+                                <div onclick="showDetails('switch')" class="topology-node bg-white border border-stone-200 p-3 rounded-lg shadow w-full max-w-[120px]">
+                                    <div class="text-2xl">🔀</div>
+                                    <div class="font-bold text-sm">Switch Accès</div>
+                                </div>
+                                <div class="h-4 w-1 bg-stone-300"></div>
+                                <div class="flex gap-2 mt-2">
+                                    <div class="text-xl" title="PC">💻</div>
+                                    <div class="text-xl" title="Phone">☎️</div>
+                                </div>
+                            </div>
+                            <!-- Wifi Branch -->
+                            <div class="flex flex-col items-center">
+                                <div class="h-6 w-1 bg-stone-300 mb-2"></div>
+                                <div onclick="showDetails('wifi')" class="topology-node bg-white border border-stone-200 p-3 rounded-lg shadow w-full max-w-[120px]">
+                                    <div class="text-2xl">📡</div>
+                                    <div class="font-bold text-sm">Borne Wifi</div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <p class="text-center text-xs text-stone-400 mt-6 italic">Cliquez sur un élément pour voir sa définition</p>
+                </div>
+
+                <!-- Info Panel -->
+                <div class="lg:col-span-1">
+                    <div id="info-panel" class="section-card h-full p-6 border-l-4 border-l-stone-300 transition-colors duration-300">
+                        <div class="flex items-center gap-3 mb-4">
+                            <span id="info-icon" class="text-4xl">👆</span>
+                            <h4 id="info-title" class="text-xl font-bold text-stone-800">Sélectionnez un élément</h4>
+                        </div>
+                        <div id="info-content" class="text-stone-600 text-sm leading-relaxed space-y-4">
+                            <p>Cliquez sur les composants du schéma à gauche pour afficher leur fonction, leurs caractéristiques et leur rôle dans le réseau.</p>
+                            <p class="text-xs bg-yellow-50 p-2 border border-yellow-100 rounded text-yellow-800">
+                                💡 <strong>Astuce :</strong> Le flux de données part des utilisateurs (bas), passe par les switchs, remonte au routeur, et sort vers Internet.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: POWER & POE -->
+        <section id="power" class="scroll-mt-20">
+            <div class="mb-6 border-l-4 border-sky-500 pl-4">
+                <h3 class="text-2xl font-bold text-stone-900">4. Alimentation & POE</h3>
+                <p class="text-stone-600 mt-1">La continuité de service dépend de l'alimentation électrique (Onduleur) et de la technologie POE (Power Over Ethernet) qui alimente les périphériques via le câble réseau.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- POE Chart -->
+                <div class="section-card p-6">
+                    <h4 class="font-bold text-lg text-stone-800 mb-2">Normes Power Over Ethernet (POE)</h4>
+                    <p class="text-sm text-stone-500 mb-6">Puissance maximale fournie par la source (Switch/Injecteur) selon la norme IEEE.</p>
+                    <div class="chart-container">
+                        <canvas id="poeChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Usage Context -->
+                <div class="space-y-6">
+                    <div class="section-card p-6">
+                        <h4 class="font-bold text-lg text-stone-800 mb-3">Quoi alimenter avec quelle norme ?</h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 bg-white border border-stone-200 rounded hover:bg-stone-50 transition">
+                                <div>
+                                    <span class="font-bold text-stone-700 block">POE (15W)</span>
+                                    <span class="text-xs text-stone-500">IEEE 802.3af</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xl">📞</span> <span class="text-xl">📷</span>
+                                    <div class="text-xs text-stone-400">Tel IP, Caméra Fixe</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-white border border-stone-200 rounded hover:bg-stone-50 transition">
+                                <div>
+                                    <span class="font-bold text-stone-700 block">POE+ (30W)</span>
+                                    <span class="text-xs text-stone-500">IEEE 802.3at</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xl">📡</span> <span class="text-xl">📹</span>
+                                    <div class="text-xs text-stone-400">Borne Wifi, Caméra Motorisée</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-white border border-stone-200 rounded hover:bg-stone-50 transition">
+                                <div>
+                                    <span class="font-bold text-stone-700 block">POE++ (90W)</span>
+                                    <span class="text-xs text-stone-500">IEEE 802.3bt</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xl">🖥️</span> <span class="text-xl">📺</span>
+                                    <div class="text-xs text-stone-400">PC léger, Écran, PTZ IR</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-card p-6 bg-amber-50 border-amber-200">
+                        <h4 class="font-bold text-lg text-amber-800 mb-2">⚠️ Protection Électrique</h4>
+                        <p class="text-sm text-amber-900 mb-3">
+                            En cas de coupure de courant, le réseau doit continuer de fonctionner pour assurer la sécurité (téléphones, caméras).
+                        </p>
+                        <ul class="list-disc list-inside text-sm text-amber-800">
+                            <li><strong>Onduleur (UPS) :</strong> Batterie de secours.</li>
+                            <li><strong>PDU :</strong> Bandeau de prises intelligent rackable.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="bg-stone-900 text-stone-400 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p class="mb-2">Basé sur le support de cours SAE 1.02 - S'initier aux réseaux informatiques.</p>
+            <p class="text-xs text-stone-600">Généré pour révision interactive.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // State for Info Panel
+        const topologyData = {
+            'internet': {
+                title: 'Internet / WAN',
+                icon: '☁️',
+                desc: 'Réseau étendu mondial. Le raccordement se fait via fibre (FTTH avec ONT), cuivre (DSL) ou liaison 4G/5G de secours.',
+                color: 'border-l-stone-500'
+            },
+            'router': {
+                title: 'Routeur',
+                icon: '🔄',
+                desc: 'Interconnecte des réseaux différents (ex: Réseau local ↔ Internet). Il travaille avec les adresses IP pour diriger les paquets vers la bonne destination.',
+                color: 'border-l-sky-500'
+            },
+            'firewall': {
+                title: 'Pare-feu (Firewall)',
+                icon: '🛡️',
+                desc: 'Garde-barrière du réseau. Il analyse le trafic entrant et sortant pour bloquer les intrusions, virus ou connexions non autorisées.',
+                color: 'border-l-red-500'
+            },
+            'switch': {
+                title: 'Switch (Commutateur)',
+                icon: '🔀',
+                desc: 'Interconnecte les appareils (PC, Imprimantes) au sein du même réseau local (LAN). Il utilise les adresses MAC pour savoir sur quel port envoyer les données.',
+                color: 'border-l-indigo-500'
+            },
+            'server': {
+                title: 'Serveurs',
+                icon: '🖥️',
+                desc: 'Ordinateurs puissants fournissant des services : AD (Authentification), DNS (Noms), DHCP (Adresses IP), Fichiers (NAS), Web.',
+                color: 'border-l-stone-800'
+            },
+            'wifi': {
+                title: 'Borne Wifi (AP)',
+                icon: '📡',
+                desc: 'Point d\'accès sans fil. Souvent alimenté en POE par le switch. Permet la mobilité des utilisateurs (Tablettes, Laptops).',
+                color: 'border-l-sky-400'
+            }
+        };
+
+        // Navigation Scroll
+        function scrollToSection(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+                // Update active state in nav (simple implementation)
+                document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            }
+            // Close mobile menu if open
+            document.getElementById('mobile-menu').classList.add('hidden');
+        }
+
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobile-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        // Topology Interaction
+        function showDetails(key) {
+            const data = topologyData[key];
+            if (!data) return;
+
+            const panel = document.getElementById('info-panel');
+            const title = document.getElementById('info-title');
+            const icon = document.getElementById('info-icon');
+            const content = document.getElementById('info-content');
+
+            // Fade out
+            panel.style.opacity = '0.5';
+
+            setTimeout(() => {
+                // Update content
+                title.textContent = data.title;
+                icon.textContent = data.icon;
+                content.innerHTML = `<p>${data.desc}</p>`;
+                
+                // Update styling
+                panel.className = `section-card h-full p-6 border-l-4 transition-colors duration-300 ${data.color}`;
+                
+                // Fade in
+                panel.style.opacity = '1';
+            }, 150);
+
+            // Visual feedback on nodes
+            document.querySelectorAll('.topology-node').forEach(node => {
+                node.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+        }
+
+        // Initialize Charts when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- Cabling Chart ---
+            const ctxCable = document.getElementById('cablingChart').getContext('2d');
+            new Chart(ctxCable, {
+                type: 'bar',
+                data: {
+                    labels: ['Cat 5', 'Cat 5e', 'Cat 6', 'Cat 6a', 'Cat 7', 'Cat 8'],
+                    datasets: [{
+                        label: 'Débit Max (Gbps)',
+                        data: [0.1, 1, 1, 10, 10, 40],
+                        backgroundColor: [
+                            '#D1D5DB', // Grey
+                            '#93C5FD', // Blue 300
+                            '#60A5FA', // Blue 400
+                            '#3B82F6', // Blue 500
+                            '#2563EB', // Blue 600
+                            '#1D4ED8'  // Blue 700
+                        ],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.raw + ' Gbps';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Vitesse (Gbps)' }
+                        }
+                    }
+                }
+            });
+
+            // --- POE Chart ---
+            const ctxPoe = document.getElementById('poeChart').getContext('2d');
+            new Chart(ctxPoe, {
+                type: 'bar',
+                data: {
+                    labels: ['POE (802.3af)', 'POE+ (802.3at)', 'POE++ (802.3bt)'],
+                    datasets: [{
+                        label: 'Puissance Max (Watts)',
+                        data: [15, 30, 90],
+                        backgroundColor: [
+                            '#FCD34D', // Amber 300
+                            '#F59E0B', // Amber 500
+                            '#D97706'  // Amber 600
+                        ],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Horizontal bar chart for variety
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.raw + ' Watts';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Puissance (Watts)' }
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
